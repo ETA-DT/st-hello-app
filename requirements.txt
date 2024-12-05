@@ -1,0 +1,10 @@
+crewAI
+langchain_community
+langchain_ibm
+ibm-watsonx-ai
+duckduckgo-search
+crewai-tools
+streamlit
+mdpd
+tm1py
+chromadb<=0.5.3
