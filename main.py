@@ -340,46 +340,59 @@ def run_crewai_app():
     def dataframe_enriched_prompt_input(cube_name, view_name):
         context = f"""{get_context(cube_name,view_name)} \nDataframe:\n{dataframe_prompt_input(cube_name,view_name)}"""
         return context
+        
+    def create_documents(path):
+        # # Loading files
+        loader = Docx2txtLoader(path)
+        # # Split documents into chunks
+        pages = loader.load_and_split()
+        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        texts = text_splitter.split_documents(pages)
+        return texts
+
+    # embedding
+    embed_params = {
+        EmbedParams.TRUNCATE_INPUT_TOKENS: 512,
+        EmbedParams.RETURN_OPTIONS: {"input_text": True},
+    }
+
+    embeddings = WatsonxEmbeddings(
+        model_id=EmbeddingTypes.IBM_SLATE_125M_ENG.value,
+        url=get_credentials()["url"],
+        apikey=get_credentials()["apikey"],
+        project_id=WATSONX_PROJECT_ID,
+        params=embed_params,
+    )
+
+    def create_vectorstore(path):
+        texts = create_documents(path)
+        return Chroma.from_documents(texts, embeddings)
+
+    def add_documents(vectorbase, path):
+        new_documents = create_documents(path)
+        vectorbase.add_documents(new_documents)
 
     def create_crewai_setup(cube_name, view_name):
 
         ### RAG Setup
 
         pythonREPL = PythonREPLTool()
-
-        # different file paths
-        file_path = "D:/Applications/Tm1/Tango_Core_Model/Data/Python_Scripts/Agent/WatsonxCrewAI2/2024-Budget-Note de Cadrage.docx"
-        # csv_path = "D:/Applications/Tm1/Tango_Core_Model/Data/Python_Scripts/Agent/WatsonxCrewAI2/00.Ventes - 01. Analyse Couts.csv"
-        # CSVSearch = CSVSearchTool(csv=csv_path)
-
         duckduckgo_search = DuckDuckGoSearchRun()
 
-        # # Loading files
-        loader = Docx2txtLoader(file_path)
-
-        # # Split documents into chunks
-        pages = loader.load_and_split()
-
-        # loader = TextLoader(filename)
-        # documents = loader.load()
-        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        texts = text_splitter.split_documents(pages)
-
-        # embedding
-        embed_params = {
-            EmbedParams.TRUNCATE_INPUT_TOKENS: 512,
-            EmbedParams.RETURN_OPTIONS: {"input_text": True},
-        }
-
-        embeddings = WatsonxEmbeddings(
-            model_id=EmbeddingTypes.IBM_SLATE_125M_ENG.value,
-            url=get_credentials()["url"],
-            apikey=get_credentials()["apikey"],
-            project_id=WATSONX_PROJECT_ID,
-            params=embed_params,
+        file_path = "D:/Applications/Tm1/Tango_Core_Model/Data/Python_Scripts/Agent/WatsonxCrewAI3/Note de Cadrage - Europe de l'Ouest.docx"
+        docsearch = create_vectorstore(file_path)
+        add_documents(
+            docsearch,
+            "D:/Applications/Tm1/Tango_Core_Model/Data/Python_Scripts/Agent/WatsonxCrewAI3/Note de Cadrage - Europe du Sud.docx",
         )
-
-        docsearch = Chroma.from_documents(texts, embeddings)
+        add_documents(
+            docsearch,
+            "D:/Applications/Tm1/Tango_Core_Model/Data/Python_Scripts/Agent/WatsonxCrewAI3/Note de Cadrage - Royaume-Uni.docx",
+        )
+        add_documents(
+            docsearch,
+            "D:/Applications/Tm1/Tango_Core_Model/Data/Python_Scripts/Agent/WatsonxCrewAI3/Note de Cadrage - Scandinavie.docx",
+        )
 
         @tool
         def retriever(query: str) -> List[Document]:
